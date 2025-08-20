@@ -32,10 +32,10 @@ This Terraform project automates the setup of a comprehensive AWS infrastructure
 ## Architecture Components
 
 ### Networking Infrastructure
-- **VPC** with 3 Availability Zones (10.0.0.0/16)
-- **Public Subnets** (10.0.0.0/24, 10.0.1.0/24, 10.0.2.0/24)
-- **Private Subnets** (10.0.10.0/24, 10.0.11.0/24, 10.0.12.0/24)
-- **Database Subnets** (10.0.20.0/24, 10.0.21.0/24, 10.0.22.0/24)
+- **VPC** with 3 Availability Zones (configurable CIDR)
+- **Public Subnets** (configurable CIDR blocks)
+- **Private Subnets** (configurable CIDR blocks)
+- **Database Subnets** (configurable CIDR blocks)
 - **NAT Gateways** in each AZ for outbound internet access
 - **Transit Gateway** for Direct Connect integration
 - **Internet Gateway** for public subnet access
@@ -108,7 +108,24 @@ cd wordpress-aws-eks
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-### 2. Configure Variables
+### 2. Prepare Source Code for CI/CD Pipeline
+
+**IMPORTANT**: Before deploying the infrastructure, you must first create an S3 bucket and upload your source code:
+
+```bash
+# Create S3 bucket for source code (use a unique name)
+aws s3 mb s3://your-unique-wordpress-source-bucket
+
+# Create deployment package
+zip -r source.zip Dockerfile wp-config.php buildspec.yml
+
+# Upload source code to S3 bucket
+aws s3 cp source.zip s3://your-unique-wordpress-source-bucket/source.zip
+```
+
+**Note**: Replace `your-unique-wordpress-source-bucket` with your actual bucket name.
+
+### 3. Configure Variables
 
 Edit `terraform.tfvars`:
 ```hcl
@@ -116,10 +133,15 @@ aws_region = "us-west-2"
 project_name = "my-wordpress-app"
 vpc_cidr = "10.0.0.0/16"
 availability_zones = ["us-west-2a", "us-west-2b", "us-west-2c"]
-source_bucket_name = "my-wordpress-source-code"
+source_bucket_name = "your-unique-wordpress-source-bucket"  # Use the S3 bucket you created above
+
+# Customize subnet CIDR blocks as needed
+public_subnet_cidrs = ["10.0.0.0/24", "10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs = ["10.0.10.0/24", "10.0.11.0/24", "10.0.12.0/24"]
+db_subnet_cidrs = ["10.0.20.0/24", "10.0.21.0/24", "10.0.22.0/24"]
 ```
 
-### 3. Deploy Infrastructure
+### 4. Deploy Infrastructure
 
 #### Option A: Using the deployment script
 ```bash
@@ -142,7 +164,7 @@ terraform apply
 aws eks update-kubeconfig --region us-west-2 --name $(terraform output -raw eks_cluster_name)
 ```
 
-### 4. Verify Infrastructure Deployment
+### 5. Verify Infrastructure Deployment
 
 ```bash
 # Check Terraform outputs
@@ -181,20 +203,18 @@ helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
 kubectl get deployment -n kube-system aws-load-balancer-controller
 ```
 
-### 2. Deploy Application via CI/CD Pipeline
+### 2. Trigger CI/CD Pipeline
+
+Since you already uploaded the source code during setup, the pipeline should automatically trigger. Monitor the deployment:
 
 ```bash
-# Get source bucket name
-SOURCE_BUCKET=$(terraform output -raw source_bucket)
-
-# Create deployment package
-zip -r source.zip Dockerfile wp-config.php buildspec.yml
-
-# Upload to trigger pipeline
-aws s3 cp source.zip s3://$SOURCE_BUCKET/source.zip
-
-# Monitor pipeline
+# Monitor pipeline status
 aws codepipeline get-pipeline-state --name $(terraform output -raw pipeline_name)
+
+# If you need to trigger manually or upload new code:
+SOURCE_BUCKET=$(terraform output -raw source_bucket)
+zip -r source.zip Dockerfile wp-config.php buildspec.yml
+aws s3 cp source.zip s3://$SOURCE_BUCKET/source.zip
 ```
 
 ### 3. Monitor Deployment
@@ -399,3 +419,41 @@ aws logs tail /aws/codebuild/<project-name> --follow
 - [Kubernetes Documentation](https://kubernetes.io/docs/)
 - [Helm Documentation](https://helm.sh/docs/)
 - [WordPress on Kubernetes Best Practices](https://kubernetes.io/docs/tutorials/stateful-application/mysql-wordpress-persistent-volume/)
+
+## Network Customization
+
+### Subnet CIDR Configuration
+
+The infrastructure uses dynamic subnet CIDR blocks that can be customized in `terraform.tfvars`:
+
+```hcl
+# Main VPC CIDR block
+vpc_cidr = "10.0.0.0/16"
+
+# Public subnet CIDRs (one per AZ)
+public_subnet_cidrs = ["10.0.0.0/24", "10.0.1.0/24", "10.0.2.0/24"]
+
+# Private subnet CIDRs (one per AZ)
+private_subnet_cidrs = ["10.0.10.0/24", "10.0.11.0/24", "10.0.12.0/24"]
+
+# Database subnet CIDRs (one per AZ)
+db_subnet_cidrs = ["10.0.20.0/24", "10.0.21.0/24", "10.0.22.0/24"]
+```
+
+### Alternative Network Configurations
+
+**Example 1: Different IP Range**
+```hcl
+vpc_cidr = "172.16.0.0/16"
+public_subnet_cidrs = ["172.16.1.0/24", "172.16.2.0/24", "172.16.3.0/24"]
+private_subnet_cidrs = ["172.16.10.0/24", "172.16.11.0/24", "172.16.12.0/24"]
+db_subnet_cidrs = ["172.16.20.0/24", "172.16.21.0/24", "172.16.22.0/24"]
+```
+
+**Example 2: Larger Subnets**
+```hcl
+vpc_cidr = "10.0.0.0/16"
+public_subnet_cidrs = ["10.0.0.0/22", "10.0.4.0/22", "10.0.8.0/22"]
+private_subnet_cidrs = ["10.0.16.0/22", "10.0.20.0/22", "10.0.24.0/22"]
+db_subnet_cidrs = ["10.0.32.0/24", "10.0.33.0/24", "10.0.34.0/24"]
+```

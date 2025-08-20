@@ -1,3 +1,7 @@
+data "aws_vpc" "main" {
+  id = var.vpc_id
+}
+
 resource "aws_elasticache_subnet_group" "main" {
   name       = "${var.project_name}-cache-subnet"
   subnet_ids = var.private_subnets
@@ -11,7 +15,7 @@ resource "aws_security_group" "redis" {
     from_port   = 6379
     to_port     = 6379
     protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [data.aws_vpc.main.cidr_block]
   }
   
   egress {

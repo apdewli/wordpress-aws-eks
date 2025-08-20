@@ -1,3 +1,7 @@
+data "aws_vpc" "main" {
+  id = var.vpc_id
+}
+
 resource "aws_db_subnet_group" "main" {
   name       = "${var.project_name}-db-subnet-group"
   subnet_ids = var.db_subnets
@@ -15,7 +19,7 @@ resource "aws_security_group" "rds" {
     from_port   = 3306
     to_port     = 3306
     protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]
+    cidr_blocks = [data.aws_vpc.main.cidr_block]
   }
   
   egress {

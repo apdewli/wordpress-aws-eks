@@ -2,4 +2,9 @@ aws_region = "us-west-2"
 project_name = "aws-compliance"
 vpc_cidr = "10.0.0.0/16"
 availability_zones = ["us-west-2a", "us-west-2b", "us-west-2c"]
-source_bucket_name = "aws-compliance-source-code"
+source_bucket_name = "your-unique-wordpress-source-bucket"  # Replace with your actual S3 bucket name
+
+# Subnet CIDR blocks (customize as needed)
+public_subnet_cidrs = ["10.0.0.0/24", "10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs = ["10.0.10.0/24", "10.0.11.0/24", "10.0.12.0/24"]
+db_subnet_cidrs = ["10.0.20.0/24", "10.0.21.0/24", "10.0.22.0/24"]
